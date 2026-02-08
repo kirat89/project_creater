@@ -1,23 +1,118 @@
-from fastapi import APIRouter, Request, HTTPException, Depends
-from typing import List
-from auth import get_current_user
+from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel
+from typing import Optional
+
+from step_execution import queries
+from utils.db_errors import rethrow_db_error
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-@router.get("/{execution_id}/steps/{step_id}/notes")
-async def get_notes(request: Request, execution_id: str, step_id: str):
-    pool = request.app.state.pool
-    rows = await pool.fetch("SELECT * FROM step_notes WHERE step_execution_id = $1 ORDER BY created_at DESC", step_id)
-    return {"notes": [dict(r) for r in rows]}
 
-@router.post("/{execution_id}/steps/{step_id}/notes", status_code=201)
-async def add_note(request: Request, execution_id: str, step_id: str, payload: dict, current_user: dict = Depends(get_current_user)):
-    note = (payload.get("note") or "").strip()
-    if not note:
-        raise HTTPException(status_code=400, detail="Note text is required")
-    pool = request.app.state.pool
-    row = await pool.fetchrow(
-        "INSERT INTO step_notes (step_execution_id, note, created_by) VALUES ($1, $2, $3) RETURNING *",
-        step_id, note, current_user["id"]
-    )
-    return {"note": dict(row)}
+class StepStatusUpdate(BaseModel):
+    status: str
+
+
+class SubstepCreate(BaseModel):
+    name: str
+    order: Optional[int] = None
+
+
+class SubstepStatusUpdate(BaseModel):
+    status: str
+
+
+@router.get("/{execution_id}/steps")
+async def get_step_executions(request: Request, execution_id: str):
+    try:
+        pool = request.app.state.pool
+        steps = await pool.fetch(queries.LIST_EXECUTION_STEPS, execution_id)
+        return {"steps": [dict(s) for s in steps]}
+    except Exception as exc:
+        logger.exception("Error in get_step_executions: %s", exc)
+        rethrow_db_error(exc)
+
+
+@router.put("/{execution_id}/steps/{step_id}")
+async def update_step_status(request: Request, execution_id: str, step_id: str, payload: StepStatusUpdate):
+    try:
+        if payload.status not in ["active", "done", "skipped"]:
+            raise HTTPException(status_code=400, detail="Status must be 'active', 'done', or 'skipped'")
+
+        pool = request.app.state.pool
+        step = await pool.fetchrow(queries.UPDATE_STEP_STATUS, payload.status, step_id, execution_id)
+        if not step:
+            raise HTTPException(status_code=404, detail="Step execution not found")
+
+        if payload.status == "done":
+            next_step = await pool.fetchrow(queries.GET_NEXT_STEP, execution_id, step["step_order"])
+            if next_step:
+                await pool.execute(queries.ACTIVATE_STEP_BY_ID, next_step["id"])
+            else:
+                await pool.execute(queries.COMPLETE_WORKFLOW_EXECUTION, execution_id)
+
+        return {"step": dict(step)}
+    except Exception as exc:
+        logger.exception("Error in update_step_status: %s", exc)
+        rethrow_db_error(exc)
+
+
+@router.post("/{execution_id}/steps/{step_id}/substeps", status_code=201)
+async def add_substep(request: Request, execution_id: str, step_id: str, payload: SubstepCreate):
+    try:
+        if not payload.name:
+            raise HTTPException(status_code=400, detail="Substep name is required")
+
+        pool = request.app.state.pool
+        max_order = await pool.fetchval(queries.GET_MAX_SUBSTEP_ORDER, step_id)
+        next_order = payload.order if payload.order is not None else (max_order or 0) + 1
+
+        row = await pool.fetchrow(queries.CREATE_SUBSTEP, step_id, payload.name, next_order, "pending")
+        return {"substep": dict(row)}
+    except Exception as exc:
+        logger.exception("Error in add_substep: %s", exc)
+        rethrow_db_error(exc)
+
+
+@router.get("/{execution_id}/steps/{step_id}/substeps")
+async def get_substeps(request: Request, execution_id: str, step_id: str):
+    try:
+        pool = request.app.state.pool
+        rows = await pool.fetch(queries.GET_SUBSTEPS, step_id)
+        return {"substeps": [dict(r) for r in rows]}
+    except Exception as exc:
+        logger.exception("Error in get_substeps: %s", exc)
+        rethrow_db_error(exc)
+
+
+@router.put("/{execution_id}/steps/{step_id}/substeps/{substep_id}")
+async def update_substep_status(request: Request, execution_id: str, step_id: str, substep_id: str, payload: SubstepStatusUpdate):
+    try:
+        if payload.status not in ["pending", "done"]:
+            raise HTTPException(status_code=400, detail="Status must be 'pending' or 'done'")
+
+        pool = request.app.state.pool
+        row = await pool.fetchrow(queries.UPDATE_SUBSTEP_STATUS, payload.status, substep_id, step_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="Substep not found")
+        return {"substep": dict(row)}
+    except Exception as exc:
+        logger.exception("Error in update_substep_status: %s", exc)
+        rethrow_db_error(exc)
+
+
+@router.delete("/{execution_id}/steps/{step_id}/substeps/{substep_id}")
+async def delete_substep(request: Request, execution_id: str, step_id: str, substep_id: str):
+    try:
+        pool = request.app.state.pool
+        substep = await pool.fetchrow(queries.GET_SUBSTEP, substep_id, step_id)
+        if not substep:
+            raise HTTPException(status_code=404, detail="Substep not found")
+
+        await pool.execute(queries.DELETE_SUBSTEP, substep_id)
+        return {"success": True, "message": "Substep deleted"}
+    except Exception as exc:
+        logger.exception("Error in delete_substep: %s", exc)
+        rethrow_db_error(exc)

@@ -8,7 +8,11 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from db import close_pool, init_pool
-from routers import auth, items, step_execution, steps, workflows
+from auth import auth
+from items import items
+from step_execution import step_execution
+from steps import steps
+from workflows import workflow
 from utils.error_handlers import register_exception_handlers
 
 
@@ -90,7 +94,7 @@ async def shutdown():
 
 register_exception_handlers(app)
 
-app.include_router(workflows.router, prefix="/api/workflows", tags=["workflows"])
+app.include_router(workflow.router, prefix="/api/workflows", tags=["workflows"])
 app.include_router(items.router, prefix="/api/items", tags=["items"])
 app.include_router(steps.router, prefix="/api/steps", tags=["steps"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
