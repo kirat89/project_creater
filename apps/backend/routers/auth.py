@@ -9,6 +9,9 @@ from pydantic import BaseModel, EmailStr
 
 from auth import queries
 from utils.db_errors import rethrow_db_error
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -62,6 +65,7 @@ async def signup(request: Request, payload: SignupPayload):
         row = await pool.fetchrow(queries.CREATE_USER, payload.email, payload.name, hashed)
         return {"user": dict(row)}
     except Exception as exc:
+        logger.exception("Error in signup: %s", exc)
         rethrow_db_error(exc)
 
 
@@ -76,6 +80,7 @@ async def login(request: Request, payload: LoginPayload):
         token = create_access_token(row["id"])
         return {"access_token": token, "token_type": "bearer"}
     except Exception as exc:
+        logger.exception("Error in login: %s", exc)
         rethrow_db_error(exc)
 
 
@@ -84,6 +89,7 @@ async def get_token(request: Request, payload: LoginPayload):
     try:
         return await login(request, payload)
     except Exception as exc:
+        logger.exception("Error in get_token: %s", exc)
         rethrow_db_error(exc)
 
 
@@ -106,6 +112,7 @@ async def get_current_user(request: Request):
             raise HTTPException(status_code=401, detail="User not found")
         return {"user": dict(row)}
     except Exception as exc:
+        logger.exception("Error in get_current_user: %s", exc)
         rethrow_db_error(exc)
 
 
@@ -114,4 +121,5 @@ async def logout(_: Request):
     try:
         return {"message": "Logged out successfully"}
     except Exception as exc:
+        logger.exception("Error in logout: %s", exc)
         rethrow_db_error(exc)

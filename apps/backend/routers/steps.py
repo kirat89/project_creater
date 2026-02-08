@@ -4,6 +4,9 @@ from typing import Optional
 
 from steps import queries
 from utils.db_errors import rethrow_db_error
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -32,6 +35,7 @@ async def list_steps(request: Request, workflow_id: str):
         rows = await pool.fetch(queries.LIST_STEPS, workflow_id)
         return {"steps": [dict(r) for r in rows]}
     except Exception as exc:
+        logger.exception("Error in list_steps: %s", exc)
         rethrow_db_error(exc)
 
 
@@ -61,6 +65,7 @@ async def create_step(request: Request, payload: StepCreate):
         )
         return {"step": dict(row)}
     except Exception as exc:
+        logger.exception("Error in create_step: %s", exc)
         rethrow_db_error(exc)
 
 
@@ -73,6 +78,7 @@ async def get_step(request: Request, step_id: str):
             raise HTTPException(status_code=404, detail="Step not found")
         return {"step": dict(row)}
     except Exception as exc:
+        logger.exception("Error in get_step: %s", exc)
         rethrow_db_error(exc)
 
 
@@ -115,6 +121,7 @@ async def update_step(request: Request, step_id: str, payload: StepUpdate):
             raise HTTPException(status_code=404, detail="Step not found")
         return {"step": dict(row)}
     except Exception as exc:
+        logger.exception("Error in update_step: %s", exc)
         rethrow_db_error(exc)
 
 
@@ -127,4 +134,5 @@ async def delete_step(request: Request, step_id: str):
             raise HTTPException(status_code=404, detail="Step not found")
         return {"step": dict(row)}
     except Exception as exc:
+        logger.exception("Error in delete_step: %s", exc)
         rethrow_db_error(exc)
