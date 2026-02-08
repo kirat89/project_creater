@@ -62,7 +62,7 @@ if [ ! -d "node_modules" ]; then
   npm install
 fi
 
-echo -e "${GREEN}Frontend starting on http://localhost:4000${NC}"
+echo -e "${GREEN}Frontend starting on http://localhost:3000${NC}"
 npm run dev &
 FRONTEND_PID=$!
 
@@ -82,7 +82,7 @@ echo -e "${GREEN}✅ Services started successfully!${NC}"
 echo ""
 echo "📍 Backend API: http://localhost:8000"
 echo "📍 API Docs: http://localhost:8000/docs"
-echo "📍 Frontend: http://localhost:4000"
+echo "📍 Frontend: http://localhost:3000"
 echo ""
 echo "Press Ctrl+C to stop all services"
 echo ""
