@@ -1,6 +1,10 @@
 # dependencies (bun install)
 node_modules
 .venv
+venv
+__pycache__
+
+
 
 # output
 out
@@ -39,3 +43,12 @@ e2b.*.local.toml
 
 **/.react-router
 apps/mobile/caches/*
+
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.log
+*.pot

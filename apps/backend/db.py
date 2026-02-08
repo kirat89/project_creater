@@ -1,6 +1,10 @@
 import os
+from dotenv import load_dotenv
 import asyncpg
 from typing import Optional
+
+# Load environment variables from .env file
+load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("NEON_DATABASE_URL")
 
