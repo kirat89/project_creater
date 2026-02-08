@@ -23,15 +23,15 @@ class WorkflowUpdate(BaseModel):
 
 @router.get("/")
 async def list_workflows(request: Request, type: Optional[str] = None):
-    pool = request.app.state.pool
-    sql = queries.LIST_WORKFLOWS_BASE
-    params = []
-    if type:
-        sql += " AND type = $1"
-        params = [type]
-    sql += " ORDER BY created_at DESC"
-
     try:
+        pool = request.app.state.pool
+        sql = queries.LIST_WORKFLOWS_BASE
+        params = []
+        if type:
+            sql += " AND type = $1"
+            params = [type]
+        sql += " ORDER BY created_at DESC"
+
         rows = await pool.fetch(sql, *params)
         return {"workflows": [dict(r) for r in rows]}
     except Exception as exc:
@@ -40,11 +40,11 @@ async def list_workflows(request: Request, type: Optional[str] = None):
 
 @router.post("/", status_code=201)
 async def create_workflow(request: Request, payload: WorkflowCreate):
-    if not payload.name or not payload.workflow_type:
-        raise HTTPException(status_code=400, detail="name and workflow_type are required")
-
-    pool = request.app.state.pool
     try:
+        if not payload.name or not payload.workflow_type:
+            raise HTTPException(status_code=400, detail="name and workflow_type are required")
+
+        pool = request.app.state.pool
         row = await pool.fetchrow(
             queries.CREATE_WORKFLOW,
             payload.name,
@@ -59,8 +59,8 @@ async def create_workflow(request: Request, payload: WorkflowCreate):
 
 @router.get("/{workflow_id}")
 async def get_workflow(request: Request, workflow_id: str):
-    pool = request.app.state.pool
     try:
+        pool = request.app.state.pool
         workflow = await pool.fetchrow(queries.GET_WORKFLOW_BY_ID, workflow_id)
         if not workflow:
             raise HTTPException(status_code=404, detail="Workflow not found")
@@ -73,8 +73,8 @@ async def get_workflow(request: Request, workflow_id: str):
 
 @router.put("/{workflow_id}")
 async def update_workflow(request: Request, workflow_id: str, payload: WorkflowUpdate):
-    pool = request.app.state.pool
     try:
+        pool = request.app.state.pool
         updates = []
         params = []
         param_idx = 1
@@ -109,8 +109,8 @@ async def update_workflow(request: Request, workflow_id: str, payload: WorkflowU
 
 @router.delete("/{workflow_id}")
 async def delete_workflow(request: Request, workflow_id: str):
-    pool = request.app.state.pool
     try:
+        pool = request.app.state.pool
         row = await pool.fetchrow(queries.SOFT_DELETE_WORKFLOW, workflow_id)
         if not row:
             raise HTTPException(status_code=404, detail="Workflow not found")

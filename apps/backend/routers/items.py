@@ -24,23 +24,22 @@ class ItemUpdate(BaseModel):
 
 @router.get("/")
 async def list_items(request: Request, type: Optional[str] = None, status: Optional[str] = None):
-    pool = request.app.state.pool
-    query = queries.LIST_ITEMS_BASE
-    params = []
-    idx = 1
-
-    if type:
-        query += f" AND i.type = ${idx}"
-        params.append(type)
-        idx += 1
-    if status:
-        query += f" AND i.status = ${idx}"
-        params.append(status)
-        idx += 1
-
-    query += " ORDER BY i.created_at DESC"
-
     try:
+        pool = request.app.state.pool
+        query = queries.LIST_ITEMS_BASE
+        params = []
+        idx = 1
+
+        if type:
+            query += f" AND i.type = ${idx}"
+            params.append(type)
+            idx += 1
+        if status:
+            query += f" AND i.status = ${idx}"
+            params.append(status)
+            idx += 1
+
+        query += " ORDER BY i.created_at DESC"
         rows = await pool.fetch(query, *params)
         return {"items": [dict(r) for r in rows]}
     except Exception as exc:
@@ -49,11 +48,11 @@ async def list_items(request: Request, type: Optional[str] = None, status: Optio
 
 @router.post("/", status_code=201)
 async def create_item(request: Request, payload: ItemCreate):
-    if not payload.title or not payload.item_type or not payload.workflow_id:
-        raise HTTPException(status_code=400, detail="title, item_type and workflow_id are required")
-
-    pool = request.app.state.pool
     try:
+        if not payload.title or not payload.item_type or not payload.workflow_id:
+            raise HTTPException(status_code=400, detail="title, item_type and workflow_id are required")
+
+        pool = request.app.state.pool
         version = await pool.fetchrow(queries.GET_LATEST_WORKFLOW_VERSION, payload.workflow_id)
         if not version:
             raise HTTPException(status_code=404, detail="Workflow version not found. Please publish the workflow first.")
@@ -102,8 +101,8 @@ async def create_item(request: Request, payload: ItemCreate):
 
 @router.get("/{item_id}")
 async def get_item(request: Request, item_id: str):
-    pool = request.app.state.pool
     try:
+        pool = request.app.state.pool
         item = await pool.fetchrow(queries.GET_ITEM, item_id)
         if not item:
             raise HTTPException(status_code=404, detail="Item not found")
@@ -124,8 +123,8 @@ async def get_item(request: Request, item_id: str):
 
 @router.put("/{item_id}")
 async def update_item(request: Request, item_id: str, payload: ItemUpdate):
-    pool = request.app.state.pool
     try:
+        pool = request.app.state.pool
         updates = []
         params = []
         param_idx = 1
@@ -161,8 +160,8 @@ async def update_item(request: Request, item_id: str, payload: ItemUpdate):
 
 @router.delete("/{item_id}")
 async def delete_item(request: Request, item_id: str):
-    pool = request.app.state.pool
     try:
+        pool = request.app.state.pool
         row = await pool.fetchrow(queries.DELETE_ITEM, item_id)
         if not row:
             raise HTTPException(status_code=404, detail="Item not found")

@@ -27,8 +27,8 @@ class StepUpdate(BaseModel):
 
 @router.get("/")
 async def list_steps(request: Request, workflow_id: str):
-    pool = request.app.state.pool
     try:
+        pool = request.app.state.pool
         rows = await pool.fetch(queries.LIST_STEPS, workflow_id)
         return {"steps": [dict(r) for r in rows]}
     except Exception as exc:
@@ -37,11 +37,11 @@ async def list_steps(request: Request, workflow_id: str):
 
 @router.post("/", status_code=201)
 async def create_step(request: Request, payload: StepCreate):
-    if not payload.name or not payload.workflow_id:
-        raise HTTPException(status_code=400, detail="name and workflow_id are required")
-
-    pool = request.app.state.pool
     try:
+        if not payload.name or not payload.workflow_id:
+            raise HTTPException(status_code=400, detail="name and workflow_id are required")
+
+        pool = request.app.state.pool
         max_order = await pool.fetchval(queries.GET_MAX_STEP_ORDER, payload.workflow_id)
         next_order = (max_order or 0) + 1
 
@@ -62,8 +62,8 @@ async def create_step(request: Request, payload: StepCreate):
 
 @router.get("/{step_id}")
 async def get_step(request: Request, step_id: str):
-    pool = request.app.state.pool
     try:
+        pool = request.app.state.pool
         row = await pool.fetchrow(queries.GET_STEP, step_id)
         if not row:
             raise HTTPException(status_code=404, detail="Step not found")
@@ -74,8 +74,8 @@ async def get_step(request: Request, step_id: str):
 
 @router.put("/{step_id}")
 async def update_step(request: Request, step_id: str, payload: StepUpdate):
-    pool = request.app.state.pool
     try:
+        pool = request.app.state.pool
         updates = []
         params = []
         param_idx = 1
@@ -116,8 +116,8 @@ async def update_step(request: Request, step_id: str, payload: StepUpdate):
 
 @router.delete("/{step_id}")
 async def delete_step(request: Request, step_id: str):
-    pool = request.app.state.pool
     try:
+        pool = request.app.state.pool
         step = await pool.fetchrow(queries.GET_STEP, step_id)
         if not step:
             raise HTTPException(status_code=404, detail="Step not found")

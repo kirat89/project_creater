@@ -52,8 +52,8 @@ class LoginPayload(BaseModel):
 
 @router.post("/signup", status_code=201)
 async def signup(request: Request, payload: SignupPayload):
-    pool = request.app.state.pool
     try:
+        pool = request.app.state.pool
         existing = await pool.fetchrow(queries.GET_USER_BY_EMAIL, payload.email)
         if existing:
             raise HTTPException(status_code=400, detail="Email already registered")
@@ -67,8 +67,8 @@ async def signup(request: Request, payload: SignupPayload):
 
 @router.post("/login")
 async def login(request: Request, payload: LoginPayload):
-    pool = request.app.state.pool
     try:
+        pool = request.app.state.pool
         row = await pool.fetchrow(queries.GET_USER_AUTH, payload.email)
         if not row or not verify_password(payload.password, row["password_hash"]):
             raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -81,23 +81,26 @@ async def login(request: Request, payload: LoginPayload):
 
 @router.post("/token")
 async def get_token(request: Request, payload: LoginPayload):
-    return await login(request, payload)
+    try:
+        return await login(request, payload)
+    except Exception as exc:
+        rethrow_db_error(exc)
 
 
 @router.get("/me")
 async def get_current_user(request: Request):
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.lower().startswith("bearer "):
-        raise HTTPException(status_code=401, detail="Missing auth token")
-
-    token = auth_header.split(" ", 1)[1].strip()
-    payload = decode_access_token(token)
-    user_id = payload.get("sub")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid token payload")
-
-    pool = request.app.state.pool
     try:
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.lower().startswith("bearer "):
+            raise HTTPException(status_code=401, detail="Missing auth token")
+
+        token = auth_header.split(" ", 1)[1].strip()
+        payload = decode_access_token(token)
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+
+        pool = request.app.state.pool
         row = await pool.fetchrow(queries.GET_USER_BY_ID, user_id)
         if not row:
             raise HTTPException(status_code=401, detail="User not found")
@@ -108,4 +111,7 @@ async def get_current_user(request: Request):
 
 @router.post("/logout")
 async def logout(_: Request):
-    return {"message": "Logged out successfully"}
+    try:
+        return {"message": "Logged out successfully"}
+    except Exception as exc:
+        rethrow_db_error(exc)
