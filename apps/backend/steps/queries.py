@@ -1,18 +1,28 @@
 LIST_STEPS = """
-SELECT ws.*
-FROM workflow_steps ws
-JOIN workflows w ON ws.workflow_id = w.id
-WHERE ws.workflow_id = $1 AND ws.is_active = true AND w.is_active = true
-ORDER BY ws.step_order
+SELECT ws.*, wsl.workflow_id, wsl.step_order
+FROM workflow_step_links wsl
+JOIN workflow_steps ws ON ws.id = wsl.step_id
+JOIN workflows w ON wsl.workflow_id = w.id
+WHERE wsl.workflow_id = $1
+  AND wsl.is_active = true
+  AND ws.is_active = true
+  AND w.is_active = true
+ORDER BY wsl.step_order
 """
-GET_MAX_STEP_ORDER = "SELECT COALESCE(MAX(step_order), 0) FROM workflow_steps WHERE workflow_id = $1 AND is_active = true"
+GET_MAX_STEP_ORDER = "SELECT COALESCE(MAX(step_order), 0) FROM workflow_step_links WHERE workflow_id = $1 AND is_active = true"
 CREATE_STEP = """
 INSERT INTO workflow_steps
 (workflow_id, name, description, step_order, step_type, can_have_substeps, is_required, is_active)
 VALUES ($1, $2, $3, $4, $5, $6, $7, true)
 RETURNING *
 """
+CREATE_WORKFLOW_STEP_LINK = """
+INSERT INTO workflow_step_links (workflow_id, step_id, step_order, is_active)
+VALUES ($1, $2, $3, true)
+RETURNING *
+"""
 GET_STEP = "SELECT * FROM workflow_steps WHERE id = $1 AND is_active = true"
 UPDATE_STEP_BASE = "UPDATE workflow_steps SET {updates} WHERE id = ${param_idx} AND is_active = true RETURNING *"
 SOFT_DELETE_STEP = "UPDATE workflow_steps SET is_active = false WHERE id = $1 AND is_active = true RETURNING *"
+SOFT_DELETE_WORKFLOW_STEP_LINK = "UPDATE workflow_step_links SET is_active = false WHERE step_id = $1 AND is_active = true"
 GET_ACTIVE_WORKFLOW = "SELECT id FROM workflows WHERE id = $1 AND is_active = true"
