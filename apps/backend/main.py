@@ -10,9 +10,9 @@ from utils.error_handlers import register_exception_handlers
 app = FastAPI(title="Create-Anything Backend")
 
 origins = [
-    "http://localhost:4000",
-    "http://127.0.0.1:4000",
-    os.getenv("FRONTEND_ORIGIN", "http://localhost:4000"),
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    os.getenv("FRONTEND_ORIGIN", "http://localhost:3000"),
 ]
 app.add_middleware(
     CORSMiddleware,

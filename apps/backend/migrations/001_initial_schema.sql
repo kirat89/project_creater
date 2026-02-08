@@ -43,7 +43,6 @@ CREATE TABLE IF NOT EXISTS workflow_steps (
   step_type TEXT NOT NULL CHECK (step_type IN ('manual', 'checklist', 'approval', 'timer')),
   can_have_substeps BOOLEAN DEFAULT false,
   is_required BOOLEAN DEFAULT false,
-  is_active BOOLEAN DEFAULT true
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -157,11 +156,6 @@ CREATE TABLE IF NOT EXISTS activity_logs (
   action TEXT,
   performed_by UUID REFERENCES users(id) ON DELETE SET NULL,
   metadata JSONB,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- Backfill safety for older databases
-ALTER TABLE workflow_steps ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
