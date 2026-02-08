@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException, Request
-import json
 from pydantic import BaseModel, Field
 from typing import Literal, Optional
 
@@ -112,36 +111,6 @@ async def update_workflow(request: Request, workflow_id: str, payload: WorkflowU
         return {"workflow": dict(row)}
     except Exception as exc:
         logger.exception("Error in update_workflow: %s", exc)
-        rethrow_db_error(exc)
-
-
-
-
-@router.post("/{workflow_id}/publish")
-async def publish_workflow(request: Request, workflow_id: str):
-    try:
-        pool = request.app.state.pool
-        workflow = await pool.fetchrow(queries.GET_WORKFLOW_BY_ID, workflow_id)
-        if not workflow:
-            raise HTTPException(status_code=404, detail="Workflow not found")
-
-        steps = await pool.fetch(queries.GET_WORKFLOW_STEPS, workflow_id)
-        next_version_number = (await pool.fetchval(queries.GET_LATEST_WORKFLOW_VERSION, workflow_id) or 0) + 1
-
-        snapshot = {
-            "workflow": dict(workflow),
-            "steps": [dict(step) for step in steps],
-        }
-
-        row = await pool.fetchrow(
-            queries.CREATE_WORKFLOW_VERSION,
-            workflow_id,
-            next_version_number,
-            json.dumps(snapshot),
-        )
-        return {"version": dict(row) if row else None}
-    except Exception as exc:
-        logger.exception("Error in publish_workflow: %s", exc)
         rethrow_db_error(exc)
 
 
