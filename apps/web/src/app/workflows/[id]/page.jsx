@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiUrl } from "@/utils/backendApi";
 import { ArrowLeft, Edit3, GitBranch, Plus } from "lucide-react";
 
 export default function WorkflowDetailPage({ params }) {
@@ -16,10 +17,10 @@ export default function WorkflowDetailPage({ params }) {
 
   const fetchWorkflow = async () => {
     try {
-      const response = await fetch(`/api/workflows/${params.id}`);
+      const response = await fetch(apiUrl(`/workflows/${params.id}`));
       if (response.ok) {
         const data = await response.json();
-        setWorkflow(data.workflow);
+        setWorkflow({ ...data.workflow, workflow_type: data.workflow.workflow_type || data.workflow.type });
         setSteps(data.steps || []);
       }
     } catch (error) {

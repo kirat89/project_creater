@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { API_ENUMS, apiUrl, assertRequiredString, isValidEnumValue } from "@/utils/backendApi";
 import { ArrowLeft, Plus, Trash2, GripVertical, Save } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,7 +31,7 @@ export default function EditWorkflowPage({ params }) {
 
   const fetchWorkflow = async () => {
     try {
-      const response = await fetch(`/api/workflows/${params.id}`);
+      const response = await fetch(apiUrl(`/workflows/${params.id}`));
       if (response.ok) {
         const data = await response.json();
         setWorkflow(data.workflow);
@@ -49,7 +50,9 @@ export default function EditWorkflowPage({ params }) {
   const updateWorkflow = async () => {
     setSaving(true);
     try {
-      const response = await fetch(`/api/workflows/${params.id}`, {
+      assertRequiredString(name, "name");
+
+      const response = await fetch(apiUrl(`/workflows/${params.id}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, description }),
@@ -75,10 +78,15 @@ export default function EditWorkflowPage({ params }) {
     }
 
     try {
-      const response = await fetch(`/api/workflows/${params.id}/steps`, {
+      assertRequiredString(newStep.name, "step.name");
+      if (!isValidEnumValue(newStep.step_type, API_ENUMS.stepTypes)) {
+        throw new Error("Invalid step type");
+      }
+
+      const response = await fetch(apiUrl(`/steps`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newStep),
+        body: JSON.stringify({ ...newStep, workflow_id: params.id }),
       });
 
       if (response.ok) {
@@ -106,7 +114,7 @@ export default function EditWorkflowPage({ params }) {
 
     try {
       const response = await fetch(
-        `/api/workflows/${params.id}/steps?stepId=${stepId}`,
+        apiUrl(`/steps/${stepId}`),
         {
           method: "DELETE",
         },
@@ -128,24 +136,7 @@ export default function EditWorkflowPage({ params }) {
     if (!confirm("This will create a new version of the workflow. Continue?"))
       return;
 
-    setSaving(true);
-    try {
-      const response = await fetch(`/api/workflows/${params.id}/publish`, {
-        method: "POST",
-      });
-
-      if (response.ok) {
-        toast.success("New version published!");
-        await fetchWorkflow();
-      } else {
-        throw new Error("Failed to publish version");
-      }
-    } catch (error) {
-      console.error("Error publishing version:", error);
-      toast.error("Failed to publish version");
-    } finally {
-      setSaving(false);
-    }
+    toast.info("Workflow publish endpoint is not available in backend API yet.");
   };
 
   const getStepTypeColor = (type) => {

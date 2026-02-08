@@ -28,3 +28,6 @@ RETURNING *
 """
 GET_SUBSTEP = "SELECT * FROM substep_executions WHERE id = $1 AND step_execution_id = $2"
 DELETE_SUBSTEP = "DELETE FROM substep_executions WHERE id = $1"
+
+GET_STEP_NOTES = "SELECT id, step_execution_id, content AS note, created_by, created_at, updated_at FROM step_notes WHERE step_execution_id = $1 ORDER BY created_at DESC"
+CREATE_STEP_NOTE = "INSERT INTO step_notes (step_execution_id, content, created_by) VALUES ($1, $2, $3) RETURNING id, step_execution_id, content AS note, created_by, created_at, updated_at"

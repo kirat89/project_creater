@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Literal, Optional
 
 from step_execution import queries
 from utils.db_errors import rethrow_db_error
@@ -9,16 +9,20 @@ router = APIRouter()
 
 
 class StepStatusUpdate(BaseModel):
-    status: str
+    status: Literal["active", "done", "skipped"]
 
 
 class SubstepCreate(BaseModel):
-    name: str
-    order: Optional[int] = None
+    name: str = Field(min_length=1, max_length=200)
+    order: Optional[int] = Field(default=None, ge=1, le=9999)
 
 
 class SubstepStatusUpdate(BaseModel):
-    status: str
+    status: Literal["pending", "done"]
+
+
+class NoteCreate(BaseModel):
+    note: str = Field(min_length=1, max_length=4000)
 
 
 @router.get("/{execution_id}/steps")
@@ -34,9 +38,6 @@ async def get_step_executions(request: Request, execution_id: str):
 @router.put("/{execution_id}/steps/{step_id}")
 async def update_step_status(request: Request, execution_id: str, step_id: str, payload: StepStatusUpdate):
     try:
-        if payload.status not in ["active", "done", "skipped"]:
-            raise HTTPException(status_code=400, detail="Status must be 'active', 'done', or 'skipped'")
-
         pool = request.app.state.pool
         step = await pool.fetchrow(queries.UPDATE_STEP_STATUS, payload.status, step_id, execution_id)
         if not step:
@@ -57,9 +58,6 @@ async def update_step_status(request: Request, execution_id: str, step_id: str, 
 @router.post("/{execution_id}/steps/{step_id}/substeps", status_code=201)
 async def add_substep(request: Request, execution_id: str, step_id: str, payload: SubstepCreate):
     try:
-        if not payload.name:
-            raise HTTPException(status_code=400, detail="Substep name is required")
-
         pool = request.app.state.pool
         max_order = await pool.fetchval(queries.GET_MAX_SUBSTEP_ORDER, step_id)
         next_order = payload.order if payload.order is not None else (max_order or 0) + 1
@@ -83,9 +81,6 @@ async def get_substeps(request: Request, execution_id: str, step_id: str):
 @router.put("/{execution_id}/steps/{step_id}/substeps/{substep_id}")
 async def update_substep_status(request: Request, execution_id: str, step_id: str, substep_id: str, payload: SubstepStatusUpdate):
     try:
-        if payload.status not in ["pending", "done"]:
-            raise HTTPException(status_code=400, detail="Status must be 'pending' or 'done'")
-
         pool = request.app.state.pool
         row = await pool.fetchrow(queries.UPDATE_SUBSTEP_STATUS, payload.status, substep_id, step_id)
         if not row:
@@ -105,5 +100,25 @@ async def delete_substep(request: Request, execution_id: str, step_id: str, subs
 
         await pool.execute(queries.DELETE_SUBSTEP, substep_id)
         return {"success": True, "message": "Substep deleted"}
+    except Exception as exc:
+        rethrow_db_error(exc)
+
+
+@router.get("/{execution_id}/steps/{step_id}/notes")
+async def get_step_notes(request: Request, execution_id: str, step_id: str):
+    try:
+        pool = request.app.state.pool
+        rows = await pool.fetch(queries.GET_STEP_NOTES, step_id)
+        return {"notes": [dict(r) for r in rows]}
+    except Exception as exc:
+        rethrow_db_error(exc)
+
+
+@router.post("/{execution_id}/steps/{step_id}/notes", status_code=201)
+async def add_step_note(request: Request, execution_id: str, step_id: str, payload: NoteCreate):
+    try:
+        pool = request.app.state.pool
+        row = await pool.fetchrow(queries.CREATE_STEP_NOTE, step_id, payload.note.strip(), None)
+        return {"note": dict(row)}
     except Exception as exc:
         rethrow_db_error(exc)

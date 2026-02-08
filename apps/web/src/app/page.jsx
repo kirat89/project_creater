@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiUrl } from "@/utils/backendApi";
 import {
   Menu,
   X,
@@ -27,18 +28,18 @@ export default function Dashboard() {
   const fetchData = async () => {
     try {
       const [itemsRes, workflowsRes] = await Promise.all([
-        fetch("/api/items"),
-        fetch("/api/workflows"),
+        fetch(apiUrl("/items")),
+        fetch(apiUrl("/workflows")),
       ]);
 
       if (itemsRes.ok) {
         const itemsData = await itemsRes.json();
-        setItems(itemsData.items || []);
+        setItems((itemsData.items || []).map((item) => ({ ...item, item_type: item.item_type || item.type, item_status: item.item_status || item.status })));
       }
 
       if (workflowsRes.ok) {
         const workflowsData = await workflowsRes.json();
-        setWorkflows(workflowsData.workflows || []);
+        setWorkflows((workflowsData.workflows || []).map((workflow) => ({ ...workflow, workflow_type: workflow.workflow_type || workflow.type })));
       }
     } catch (error) {
       console.error("Error fetching data:", error);

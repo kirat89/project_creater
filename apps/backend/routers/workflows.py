@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Literal, Optional
 
 from utils.db_errors import rethrow_db_error
 from workflows import queries
@@ -9,20 +9,20 @@ router = APIRouter()
 
 
 class WorkflowCreate(BaseModel):
-    name: str
-    description: Optional[str] = None
-    workflow_type: str
+    name: str = Field(min_length=1, max_length=200)
+    description: Optional[str] = Field(default=None, max_length=2000)
+    workflow_type: Literal["task", "product", "habit", "generic"]
     created_by: Optional[str] = None
 
 
 class WorkflowUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    workflow_type: Optional[str] = None
+    name: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    description: Optional[str] = Field(default=None, max_length=2000)
+    workflow_type: Optional[Literal["task", "product", "habit", "generic"]] = None
 
 
 @router.get("/")
-async def list_workflows(request: Request, type: Optional[str] = None):
+async def list_workflows(request: Request, type: Optional[Literal["task", "product", "habit", "generic"]] = None):
     try:
         pool = request.app.state.pool
         sql = queries.LIST_WORKFLOWS_BASE
