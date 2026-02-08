@@ -97,7 +97,7 @@ async def update_workflow(request: Request, workflow_id: str, payload: WorkflowU
 
         updates.append("updated_at = NOW()")
         params.append(workflow_id)
-        sql = f"UPDATE workflows SET {', '.join(updates)} WHERE id = ${param_idx} RETURNING *"
+        sql = queries.UPDATE_WORKFLOW_BASE.format(updates=", ".join(updates), param_idx=param_idx)
 
         row = await pool.fetchrow(sql, *params)
         if not row:

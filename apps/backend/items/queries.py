@@ -16,12 +16,17 @@ SELECT
   ) AS total_steps
 FROM items i
 LEFT JOIN workflow_versions wv ON i.workflow_version_id = wv.id
-WHERE 1=1
+LEFT JOIN workflows w ON wv.workflow_id = w.id
+WHERE (w.id IS NULL OR w.is_active = true)
 """
-GET_LATEST_WORKFLOW_VERSION = (
-    "SELECT * FROM workflow_versions WHERE workflow_id = $1 "
-    "ORDER BY version_number DESC LIMIT 1"
-)
+GET_LATEST_WORKFLOW_VERSION = """
+SELECT wv.*
+FROM workflow_versions wv
+JOIN workflows w ON w.id = wv.workflow_id
+WHERE wv.workflow_id = $1 AND w.is_active = true
+ORDER BY wv.version_number DESC
+LIMIT 1
+"""
 CREATE_ITEM = (
     "INSERT INTO items (title, description, type, workflow_version_id, status) "
     "VALUES ($1, $2, $3, $4, $5) RETURNING *"
@@ -51,4 +56,4 @@ GET_ITEM = "SELECT * FROM items WHERE id = $1"
 GET_ITEM_EXECUTION = "SELECT * FROM workflow_executions WHERE item_id = $1"
 GET_EXECUTION_STEPS = "SELECT * FROM step_executions WHERE workflow_execution_id = $1 ORDER BY step_order"
 UPDATE_ITEM_BASE = "UPDATE items SET {updates} WHERE id = ${param_idx} RETURNING *"
-DELETE_ITEM = "DELETE FROM items WHERE id = $1 RETURNING *"
+ARCHIVE_ITEM = "UPDATE items SET status = 'archived' WHERE id = $1 AND status <> 'archived' RETURNING *"

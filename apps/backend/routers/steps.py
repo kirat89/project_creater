@@ -42,6 +42,10 @@ async def create_step(request: Request, payload: StepCreate):
             raise HTTPException(status_code=400, detail="name and workflow_id are required")
 
         pool = request.app.state.pool
+        workflow = await pool.fetchrow(queries.GET_ACTIVE_WORKFLOW, payload.workflow_id)
+        if not workflow:
+            raise HTTPException(status_code=404, detail="Workflow not found")
+
         max_order = await pool.fetchval(queries.GET_MAX_STEP_ORDER, payload.workflow_id)
         next_order = (max_order or 0) + 1
 
@@ -118,10 +122,9 @@ async def update_step(request: Request, step_id: str, payload: StepUpdate):
 async def delete_step(request: Request, step_id: str):
     try:
         pool = request.app.state.pool
-        step = await pool.fetchrow(queries.GET_STEP, step_id)
-        if not step:
+        row = await pool.fetchrow(queries.SOFT_DELETE_STEP, step_id)
+        if not row:
             raise HTTPException(status_code=404, detail="Step not found")
-        await pool.execute(queries.DELETE_STEP, step_id)
-        return {"success": True, "message": "Step deleted"}
+        return {"step": dict(row)}
     except Exception as exc:
         rethrow_db_error(exc)

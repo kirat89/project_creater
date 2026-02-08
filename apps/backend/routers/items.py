@@ -55,7 +55,7 @@ async def create_item(request: Request, payload: ItemCreate):
         pool = request.app.state.pool
         version = await pool.fetchrow(queries.GET_LATEST_WORKFLOW_VERSION, payload.workflow_id)
         if not version:
-            raise HTTPException(status_code=404, detail="Workflow version not found. Please publish the workflow first.")
+            raise HTTPException(status_code=404, detail="Workflow not found or inactive. Please publish an active workflow first.")
 
         item_row = await pool.fetchrow(
             queries.CREATE_ITEM,
@@ -162,9 +162,13 @@ async def update_item(request: Request, item_id: str, payload: ItemUpdate):
 async def delete_item(request: Request, item_id: str):
     try:
         pool = request.app.state.pool
-        row = await pool.fetchrow(queries.DELETE_ITEM, item_id)
+        row = await pool.fetchrow(queries.ARCHIVE_ITEM, item_id)
         if not row:
-            raise HTTPException(status_code=404, detail="Item not found")
-        return {"success": True, "message": "Item deleted"}
+            existing = await pool.fetchrow(queries.GET_ITEM, item_id)
+            if not existing:
+                raise HTTPException(status_code=404, detail="Item not found")
+            return {"success": True, "message": "Item already archived"}
+
+        return {"success": True, "message": "Item archived", "item": dict(row)}
     except Exception as exc:
         rethrow_db_error(exc)
