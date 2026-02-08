@@ -1,47 +1,42 @@
-from fastapi import APIRouter, Request, HTTPException
-from pydantic import BaseModel, EmailStr
-from typing import Optional
-import os
 from datetime import datetime, timedelta
-from jose import jwt, JWTError
+import os
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException, Request
+from jose import JWTError, jwt
 from passlib.context import CryptContext
+from pydantic import BaseModel, EmailStr
+
+from auth import queries
+from utils.db_errors import rethrow_db_error
 
 router = APIRouter()
 
-# Security setup
 SECRET_KEY = os.getenv("JWT_SECRET", "dev-secret-change-me-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
-
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def get_password_hash(password: str) -> str:
-    """Hash password using bcrypt"""
     return pwd_context.hash(password)
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    """Verify password against hash"""
     return pwd_context.verify(plain, hashed)
 
 
 def create_access_token(subject: str, expires_minutes: Optional[int] = None) -> str:
-    """Create JWT access token"""
-    expire = datetime.utcnow() + timedelta(
-        minutes=(expires_minutes or ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
+    expire = datetime.utcnow() + timedelta(minutes=(expires_minutes or ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode = {"exp": expire, "sub": str(subject)}
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def decode_access_token(token: str) -> dict:
-    """Decode and verify JWT token"""
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError as exc:
+        raise HTTPException(status_code=401, detail="Invalid authentication credentials") from exc
 
 
 class SignupPayload(BaseModel):
@@ -55,100 +50,62 @@ class LoginPayload(BaseModel):
     password: str
 
 
-class UserResponse(BaseModel):
-    id: str
-    email: str
-    name: Optional[str]
-
-
 @router.post("/signup", status_code=201)
 async def signup(request: Request, payload: SignupPayload):
-    """Register a new user"""
     pool = request.app.state.pool
-    
     try:
-        # Check if user already exists
-        existing = await pool.fetchrow(
-            "SELECT id FROM users WHERE email = $1", payload.email
-        )
+        existing = await pool.fetchrow(queries.GET_USER_BY_EMAIL, payload.email)
         if existing:
-            raise HTTPException(
-                status_code=400, detail="Email already registered"
-            )
-        
+            raise HTTPException(status_code=400, detail="Email already registered")
+
         hashed = get_password_hash(payload.password)
-        row = await pool.fetchrow(
-            """INSERT INTO users (email, name, password_hash) 
-               VALUES ($1, $2, $3) 
-               RETURNING id, email, name, created_at""",
-            payload.email,
-            payload.name,
-            hashed,
-        )
-        
+        row = await pool.fetchrow(queries.CREATE_USER, payload.email, payload.name, hashed)
         return {"user": dict(row)}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except Exception as exc:
+        rethrow_db_error(exc)
 
 
 @router.post("/login")
 async def login(request: Request, payload: LoginPayload):
-    """Login user and return access token"""
     pool = request.app.state.pool
-    
     try:
-        row = await pool.fetchrow(
-            "SELECT id, password_hash FROM users WHERE email = $1",
-            payload.email,
-        )
-        
+        row = await pool.fetchrow(queries.GET_USER_AUTH, payload.email)
         if not row or not verify_password(payload.password, row["password_hash"]):
-            raise HTTPException(
-                status_code=401, detail="Invalid email or password"
-            )
-        
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
         token = create_access_token(row["id"])
         return {"access_token": token, "token_type": "bearer"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except Exception as exc:
+        rethrow_db_error(exc)
 
 
 @router.post("/token")
 async def get_token(request: Request, payload: LoginPayload):
-    """OAuth-style token endpoint"""
     return await login(request, payload)
 
 
 @router.get("/me")
 async def get_current_user(request: Request):
-    """Get current user from authorization header"""
-    auth = request.headers.get("Authorization")
-    if not auth or not auth.lower().startswith("bearer "):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Missing auth token")
-    
-    token = auth.split(" ", 1)[1].strip()
+
+    token = auth_header.split(" ", 1)[1].strip()
     payload = decode_access_token(token)
     user_id = payload.get("sub")
-    
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token payload")
-    
+
     pool = request.app.state.pool
-    row = await pool.fetchrow(
-        "SELECT id, email, name, created_at FROM users WHERE id = $1", user_id
-    )
-    
-    if not row:
-        raise HTTPException(status_code=401, detail="User not found")
-    
-    return {"user": dict(row)}
+    try:
+        row = await pool.fetchrow(queries.GET_USER_BY_ID, user_id)
+        if not row:
+            raise HTTPException(status_code=401, detail="User not found")
+        return {"user": dict(row)}
+    except Exception as exc:
+        rethrow_db_error(exc)
 
 
 @router.post("/logout")
-async def logout(request: Request):
-    """Logout user (client-side token deletion)"""
+async def logout(_: Request):
     return {"message": "Logged out successfully"}
