@@ -41,6 +41,14 @@ if ! python -m pip show fastapi > /dev/null 2>&1; then
   pip install -r requirements.txt
 fi
 
+# Run database migrations before starting backend
+echo -e "${YELLOW}Running backend migrations...${NC}"
+if ! python -m utils.migrations; then
+  echo -e "${RED}Migrations failed; aborting startup.${NC}"
+  popd > /dev/null
+  exit 1
+fi
+
 # Start the backend
 echo -e "${GREEN}Backend starting on http://localhost:8000${NC}"
 python -m uvicorn main:app --reload &

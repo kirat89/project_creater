@@ -45,6 +45,16 @@ echo Installing dependencies...
 pip install -r requirements.txt
 
 
+REM Run database migrations before launching backend
+echo Running backend migrations...
+python -m utils.migrations
+if errorlevel 1 (
+  echo Migrations failed. Aborting.
+  pause
+  popd >nul
+  exit /b 1
+)
+
 REM Start the backend in a new window
 echo Starting backend on http://localhost:8000
 start "Create-Anything Backend" cmd /k python -m uvicorn main:app --reload
