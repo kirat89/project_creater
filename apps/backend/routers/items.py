@@ -2,9 +2,12 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import Literal, Optional
 import json
+import logging
 
 from items import queries
 from utils.db_errors import rethrow_db_error
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -43,6 +46,7 @@ async def list_items(request: Request, type: Optional[Literal["task", "product",
         rows = await pool.fetch(query, *params)
         return {"items": [dict(r) for r in rows]}
     except Exception as exc:
+        logger.exception("Error in list_items: %s", exc)
         rethrow_db_error(exc)
 
 
@@ -96,6 +100,7 @@ async def create_item(request: Request, payload: ItemCreate):
 
         return {"item": dict(item_row), "execution": dict(execution_row)}
     except Exception as exc:
+        logger.exception("Error in create_item: %s", exc)
         rethrow_db_error(exc)
 
 
@@ -118,6 +123,7 @@ async def get_item(request: Request, item_id: str):
             "steps": [dict(s) for s in steps],
         }
     except Exception as exc:
+        logger.exception("Error in get_item: %s", exc)
         rethrow_db_error(exc)
 
 
@@ -155,6 +161,7 @@ async def update_item(request: Request, item_id: str, payload: ItemUpdate):
 
         return {"item": dict(row)}
     except Exception as exc:
+        logger.exception("Error in update_item: %s", exc)
         rethrow_db_error(exc)
 
 
@@ -171,4 +178,5 @@ async def delete_item(request: Request, item_id: str):
 
         return {"success": True, "message": "Item archived", "item": dict(row)}
     except Exception as exc:
+        logger.exception("Error in delete_item: %s", exc)
         rethrow_db_error(exc)

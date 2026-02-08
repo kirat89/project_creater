@@ -2,7 +2,7 @@
 node_modules
 .venv
 venv
-__pycache__
+apps/backend/__pycache__/
 
 
 
@@ -52,3 +52,4 @@ __pycache__
 *.sqlite3
 *.log
 *.pot
+apps/backend/__pycache__

@@ -4,6 +4,9 @@ from typing import Literal, Optional
 
 from step_execution import queries
 from utils.db_errors import rethrow_db_error
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -32,6 +35,7 @@ async def get_step_executions(request: Request, execution_id: str):
         steps = await pool.fetch(queries.LIST_EXECUTION_STEPS, execution_id)
         return {"steps": [dict(s) for s in steps]}
     except Exception as exc:
+        logger.exception("Error in get_step_executions: %s", exc)
         rethrow_db_error(exc)
 
 
@@ -52,6 +56,7 @@ async def update_step_status(request: Request, execution_id: str, step_id: str, 
 
         return {"step": dict(step)}
     except Exception as exc:
+        logger.exception("Error in update_step_status: %s", exc)
         rethrow_db_error(exc)
 
 
@@ -65,6 +70,7 @@ async def add_substep(request: Request, execution_id: str, step_id: str, payload
         row = await pool.fetchrow(queries.CREATE_SUBSTEP, step_id, payload.name, next_order, "pending")
         return {"substep": dict(row)}
     except Exception as exc:
+        logger.exception("Error in add_substep: %s", exc)
         rethrow_db_error(exc)
 
 
@@ -75,6 +81,7 @@ async def get_substeps(request: Request, execution_id: str, step_id: str):
         rows = await pool.fetch(queries.GET_SUBSTEPS, step_id)
         return {"substeps": [dict(r) for r in rows]}
     except Exception as exc:
+        logger.exception("Error in get_substeps: %s", exc)
         rethrow_db_error(exc)
 
 
@@ -87,6 +94,7 @@ async def update_substep_status(request: Request, execution_id: str, step_id: st
             raise HTTPException(status_code=404, detail="Substep not found")
         return {"substep": dict(row)}
     except Exception as exc:
+        logger.exception("Error in update_substep_status: %s", exc)
         rethrow_db_error(exc)
 
 
@@ -101,6 +109,7 @@ async def delete_substep(request: Request, execution_id: str, step_id: str, subs
         await pool.execute(queries.DELETE_SUBSTEP, substep_id)
         return {"success": True, "message": "Substep deleted"}
     except Exception as exc:
+        logger.exception("Error in delete_substep: %s", exc)
         rethrow_db_error(exc)
 
 

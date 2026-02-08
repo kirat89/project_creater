@@ -4,6 +4,9 @@ from typing import Literal, Optional
 
 from utils.db_errors import rethrow_db_error
 from workflows import queries
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -35,6 +38,7 @@ async def list_workflows(request: Request, type: Optional[Literal["task", "produ
         rows = await pool.fetch(sql, *params)
         return {"workflows": [dict(r) for r in rows]}
     except Exception as exc:
+        logger.exception("Error in list_workflows: %s", exc)
         rethrow_db_error(exc)
 
 
@@ -54,6 +58,7 @@ async def create_workflow(request: Request, payload: WorkflowCreate):
         )
         return {"workflow": dict(row) if row else None}
     except Exception as exc:
+        logger.exception("Error in create_workflow: %s", exc)
         rethrow_db_error(exc)
 
 
@@ -68,6 +73,7 @@ async def get_workflow(request: Request, workflow_id: str):
         steps = await pool.fetch(queries.GET_WORKFLOW_STEPS, workflow_id)
         return {"workflow": dict(workflow), "steps": [dict(s) for s in steps]}
     except Exception as exc:
+        logger.exception("Error in get_workflow: %s", exc)
         rethrow_db_error(exc)
 
 
@@ -104,6 +110,7 @@ async def update_workflow(request: Request, workflow_id: str, payload: WorkflowU
             raise HTTPException(status_code=404, detail="Workflow not found")
         return {"workflow": dict(row)}
     except Exception as exc:
+        logger.exception("Error in update_workflow: %s", exc)
         rethrow_db_error(exc)
 
 
@@ -116,4 +123,5 @@ async def delete_workflow(request: Request, workflow_id: str):
             raise HTTPException(status_code=404, detail="Workflow not found")
         return {"workflow": dict(row)}
     except Exception as exc:
+        logger.exception("Error in delete_workflow: %s", exc)
         rethrow_db_error(exc)
