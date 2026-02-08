@@ -53,28 +53,16 @@ async def create_step(request: Request, payload: StepCreate):
         max_order = await pool.fetchval(queries.GET_MAX_STEP_ORDER, payload.workflow_id)
         next_order = (max_order or 0) + 1
 
-        async with pool.acquire() as conn:
-            async with conn.transaction():
-                row = await conn.fetchrow(
-                    queries.CREATE_STEP,
-                    payload.workflow_id,
-                    payload.name,
-                    payload.description,
-                    next_order,
-                    payload.step_type,
-                    payload.can_have_substeps,
-                    payload.is_required,
-                )
-                if not row:
-                    raise HTTPException(status_code=500, detail="Failed to create step")
-
-                await conn.execute(
-                    queries.CREATE_WORKFLOW_STEP_LINK,
-                    payload.workflow_id,
-                    row["id"],
-                    next_order,
-                )
-
+        row = await pool.fetchrow(
+            queries.CREATE_STEP,
+            payload.workflow_id,
+            payload.name,
+            payload.description,
+            next_order,
+            payload.step_type,
+            payload.can_have_substeps,
+            payload.is_required,
+        )
         return {"step": dict(row)}
     except Exception as exc:
         logger.exception("Error in create_step: %s", exc)
@@ -141,14 +129,9 @@ async def update_step(request: Request, step_id: str, payload: StepUpdate):
 async def delete_step(request: Request, step_id: str):
     try:
         pool = request.app.state.pool
-        async with pool.acquire() as conn:
-            async with conn.transaction():
-                row = await conn.fetchrow(queries.SOFT_DELETE_STEP, step_id)
-                if not row:
-                    raise HTTPException(status_code=404, detail="Step not found")
-
-                await conn.execute(queries.SOFT_DELETE_WORKFLOW_STEP_LINK, step_id)
-
+        row = await pool.fetchrow(queries.SOFT_DELETE_STEP, step_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="Step not found")
         return {"step": dict(row)}
     except Exception as exc:
         logger.exception("Error in delete_step: %s", exc)
