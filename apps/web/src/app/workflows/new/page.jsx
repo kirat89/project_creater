@@ -2,6 +2,13 @@
 
 import { useState } from "react";
 import { Menu, X, Plus, Trash2, Save } from "lucide-react";
+import {
+  API_ENUMS,
+  apiUrl,
+  assertMaxLength,
+  assertRequiredString,
+  isValidEnumValue,
+} from "@/utils/backendApi";
 
 export default function NewWorkflowPage() {
   const [name, setName] = useState("");
@@ -41,6 +48,11 @@ export default function NewWorkflowPage() {
       return;
     }
 
+    if (!isValidEnumValue(workflowType, API_ENUMS.workflowTypes)) {
+      setError("Invalid workflow type");
+      return;
+    }
+
     if (steps.length === 0) {
       setError("Add at least one step to your workflow");
       return;
@@ -56,7 +68,11 @@ export default function NewWorkflowPage() {
     setError("");
 
     try {
-      const workflowRes = await fetch("/api/workflows", {
+      assertRequiredString(name, "name");
+      assertMaxLength(name, "name", 200);
+      assertMaxLength(description, "description", 2000);
+
+      const workflowRes = await fetch(apiUrl("/workflows"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -71,10 +87,15 @@ export default function NewWorkflowPage() {
       const { workflow } = await workflowRes.json();
 
       for (const step of steps) {
-        await fetch(`/api/workflows/${workflow.id}/steps`, {
+        if (!isValidEnumValue(step.step_type, API_ENUMS.stepTypes)) {
+          throw new Error("Invalid step type");
+        }
+
+        await fetch(apiUrl(`/steps`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            workflow_id: workflow.id,
             name: step.name,
             description: step.description,
             step_type: step.step_type,
@@ -83,8 +104,6 @@ export default function NewWorkflowPage() {
           }),
         });
       }
-
-      await fetch(`/api/workflows/${workflow.id}/publish`, { method: "POST" });
 
       window.location.href = `/workflows/${workflow.id}`;
     } catch (err) {

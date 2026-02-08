@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { API_ENUMS, apiUrl, assertRequiredString, isValidEnumValue } from "@/utils/backendApi";
 import { Plus, ArrowLeft } from "lucide-react";
 
 export default function NewItemPage() {
@@ -18,10 +19,10 @@ export default function NewItemPage() {
 
   const fetchWorkflows = async () => {
     try {
-      const response = await fetch("/api/workflows");
+      const response = await fetch(apiUrl("/workflows"));
       if (response.ok) {
         const data = await response.json();
-        setWorkflows(data.workflows || []);
+        setWorkflows((data.workflows || []).map((workflow) => ({ ...workflow, workflow_type: workflow.workflow_type || workflow.type })));
       }
     } catch (error) {
       console.error("Error fetching workflows:", error);
@@ -45,7 +46,12 @@ export default function NewItemPage() {
     setError("");
 
     try {
-      const response = await fetch("/api/items", {
+      assertRequiredString(title, "title");
+      if (!isValidEnumValue(itemType, API_ENUMS.itemTypes)) {
+        throw new Error("Invalid item type");
+      }
+
+      const response = await fetch(apiUrl("/items"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

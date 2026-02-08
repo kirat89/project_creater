@@ -10,6 +10,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { toast } from "sonner";
+import { API_ENUMS, apiUrl, assertRequiredString, isValidEnumValue } from "@/utils/backendApi";
 
 export default function ItemExecutionPage({ params }) {
   const [item, setItem] = useState(null);
@@ -31,14 +32,21 @@ export default function ItemExecutionPage({ params }) {
 
   const fetchItem = async () => {
     try {
-      const response = await fetch(`/api/items/${params.id}`);
+      const response = await fetch(apiUrl(`/items/${params.id}`));
       if (response.ok) {
         const data = await response.json();
-        setItem(data.item);
-        setExecution(data.execution);
-        const steps = data.stepExecutions || [];
+        setItem(data.item ? { ...data.item, item_type: data.item.item_type || data.item.type, item_status: data.item.item_status || data.item.status } : null);
+        setExecution(data.execution ? { ...data.execution, execution_status: data.execution.execution_status || data.execution.status } : null);
+        const steps = (data.steps || data.stepExecutions || []).map((step) => ({
+          ...step,
+          step_status: step.step_status || step.status,
+        }));
         setStepExecutions(steps);
-        setSubsteps(data.substeps || []);
+        const loadedSubsteps = (data.substeps || []).map((substep) => ({
+          ...substep,
+          substep_status: substep.substep_status || substep.status,
+        }));
+        setSubsteps(loadedSubsteps);
 
         // Fetch notes for each step
         if (data.execution) {
@@ -57,7 +65,7 @@ export default function ItemExecutionPage({ params }) {
   const fetchNotesForStep = async (executionId, stepId) => {
     try {
       const response = await fetch(
-        `/api/executions/${executionId}/steps/${stepId}/notes`,
+        apiUrl(`/executions/${executionId}/steps/${stepId}/notes`),
       );
       if (response.ok) {
         const data = await response.json();
@@ -70,12 +78,15 @@ export default function ItemExecutionPage({ params }) {
 
   const updateStepStatus = async (stepId, status) => {
     try {
+      if (!isValidEnumValue(status, API_ENUMS.stepStatuses.filter((s) => s !== "pending"))) {
+        throw new Error("Invalid step status");
+      }
       const response = await fetch(
-        `/api/executions/${execution.id}/steps/${stepId}`,
+        apiUrl(`/executions/${execution.id}/steps/${stepId}`),
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ step_status: status }),
+          body: JSON.stringify({ status }),
         },
       );
 
@@ -108,7 +119,7 @@ export default function ItemExecutionPage({ params }) {
 
     try {
       const response = await fetch(
-        `/api/executions/${execution.id}/steps/${stepId}/notes`,
+        apiUrl(`/executions/${execution.id}/steps/${stepId}/notes`),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -146,8 +157,9 @@ export default function ItemExecutionPage({ params }) {
     setAddingSubstep({ ...addingSubstep, [stepId]: true });
 
     try {
+      assertRequiredString(name.trim(), "substep name");
       const response = await fetch(
-        `/api/executions/${execution.id}/steps/${stepId}/substeps`,
+        apiUrl(`/executions/${execution.id}/steps/${stepId}/substeps`),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -170,15 +182,15 @@ export default function ItemExecutionPage({ params }) {
     const newStatus = currentStatus === "done" ? "pending" : "done";
 
     try {
+      if (!isValidEnumValue(newStatus, API_ENUMS.substepStatuses)) {
+        throw new Error("Invalid substep status");
+      }
       const response = await fetch(
-        `/api/executions/${execution.id}/steps/${stepId}/substeps`,
+        apiUrl(`/executions/${execution.id}/steps/${stepId}/substeps/${substepId}`),
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            substep_id: substepId,
-            substep_status: newStatus,
-          }),
+          body: JSON.stringify({ status: newStatus }),
         },
       );
 

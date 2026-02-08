@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Literal, Optional
 
 from steps import queries
 from utils.db_errors import rethrow_db_error
@@ -9,18 +9,18 @@ router = APIRouter()
 
 
 class StepCreate(BaseModel):
-    workflow_id: str
-    name: str
-    description: Optional[str] = None
-    step_type: str = "manual"
+    workflow_id: str = Field(min_length=1)
+    name: str = Field(min_length=1, max_length=200)
+    description: Optional[str] = Field(default=None, max_length=2000)
+    step_type: Literal["manual", "checklist", "approval", "timer"] = "manual"
     can_have_substeps: bool = False
     is_required: bool = False
 
 
 class StepUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    step_type: Optional[str] = None
+    name: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    description: Optional[str] = Field(default=None, max_length=2000)
+    step_type: Optional[Literal["manual", "checklist", "approval", "timer"]] = None
     can_have_substeps: Optional[bool] = None
     is_required: Optional[bool] = None
 

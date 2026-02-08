@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { API_ENUMS, apiUrl, isValidEnumValue } from "@/utils/backendApi";
 import {
   Menu,
   X,
@@ -27,12 +28,16 @@ export default function ItemsPage() {
 
   const fetchItems = async () => {
     try {
-      const url = filter === "all" ? "/api/items" : `/api/items?type=${filter}`;
+      const url =
+        filter === "all" ? apiUrl("/items") : apiUrl(`/items?type=${filter}`);
+      if (filter !== "all" && !isValidEnumValue(filter, API_ENUMS.itemTypes)) {
+        throw new Error("Invalid item type filter");
+      }
 
       const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
-        setItems(data.items || []);
+        setItems((data.items || []).map((item) => ({ ...item, item_type: item.item_type || item.type, item_status: item.item_status || item.status })));
       }
     } catch (error) {
       console.error("Error fetching items:", error);

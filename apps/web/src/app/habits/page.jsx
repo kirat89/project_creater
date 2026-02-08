@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiUrl } from "@/utils/backendApi";
 import {
   Menu,
   X,
@@ -37,18 +38,18 @@ export default function HabitsPage() {
   const fetchData = async () => {
     try {
       const [habitsRes, workflowsRes] = await Promise.all([
-        fetch("/api/items?type=habit"),
-        fetch("/api/workflows?type=habit"),
+        fetch(apiUrl("/items?type=habit")),
+        fetch(apiUrl("/workflows?type=habit")),
       ]);
 
       if (habitsRes.ok) {
         const data = await habitsRes.json();
-        setHabits(data.items || []);
+        setHabits((data.items || []).map((item) => ({ ...item, item_type: item.item_type || item.type, item_status: item.item_status || item.status })));
       }
 
       if (workflowsRes.ok) {
         const data = await workflowsRes.json();
-        setWorkflows(data.workflows || []);
+        setWorkflows((data.workflows || []).map((workflow) => ({ ...workflow, workflow_type: workflow.workflow_type || workflow.type })));
       }
     } catch (error) {
       console.error("Error fetching habits:", error);
@@ -65,7 +66,7 @@ export default function HabitsPage() {
 
     setCreating(true);
     try {
-      const response = await fetch("/api/items", {
+      const response = await fetch(apiUrl("/items"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

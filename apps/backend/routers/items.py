@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Literal, Optional
 import json
 
 from items import queries
@@ -10,20 +10,20 @@ router = APIRouter()
 
 
 class ItemCreate(BaseModel):
-    title: str
-    item_type: str
-    workflow_id: str
-    description: Optional[str] = None
+    title: str = Field(min_length=1, max_length=200)
+    item_type: Literal["task", "product", "habit"]
+    workflow_id: str = Field(min_length=1)
+    description: Optional[str] = Field(default=None, max_length=2000)
 
 
 class ItemUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    status: Optional[str] = None
+    title: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    description: Optional[str] = Field(default=None, max_length=2000)
+    status: Optional[Literal["not_started", "in_progress", "completed", "archived"]] = None
 
 
 @router.get("/")
-async def list_items(request: Request, type: Optional[str] = None, status: Optional[str] = None):
+async def list_items(request: Request, type: Optional[Literal["task", "product", "habit"]] = None, status: Optional[Literal["not_started", "in_progress", "completed", "archived"]] = None):
     try:
         pool = request.app.state.pool
         query = queries.LIST_ITEMS_BASE
