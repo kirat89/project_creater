@@ -8,6 +8,7 @@ import {
   X as XIcon,
   Clock,
   MessageSquare,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { API_ENUMS, apiUrl, assertRequiredString, isValidEnumValue } from "@/utils/backendApi";
@@ -23,12 +24,21 @@ export default function ItemExecutionPage({ params }) {
   const [addingSubstep, setAddingSubstep] = useState({});
   const [newNote, setNewNote] = useState({});
   const [showNotes, setShowNotes] = useState({});
+  const [timerUpdateMinutes, setTimerUpdateMinutes] = useState({});
+  const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
     if (params.id) {
       fetchItem();
     }
   }, [params.id]);
+
+
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const fetchItem = async () => {
     try {
@@ -39,6 +49,8 @@ export default function ItemExecutionPage({ params }) {
         setExecution(data.execution ? { ...data.execution, execution_status: data.execution.execution_status || data.execution.status } : null);
         const steps = (data.steps || data.stepExecutions || []).map((step) => ({
           ...step,
+          step_name: step.step_name || step.name,
+          step_description: step.step_description || step.description,
           step_status: step.step_status || step.status,
         }));
         setStepExecutions(steps);
@@ -78,7 +90,7 @@ export default function ItemExecutionPage({ params }) {
 
   const updateStepStatus = async (stepId, status) => {
     try {
-      if (!isValidEnumValue(status, API_ENUMS.stepStatuses.filter((s) => s !== "pending"))) {
+      if (!isValidEnumValue(status, ["active", "done", "skipped"])) {
         throw new Error("Invalid step status");
       }
       const response = await fetch(
@@ -136,6 +148,38 @@ export default function ItemExecutionPage({ params }) {
       console.error("Error adding note:", error);
       toast.error("Failed to add note");
     }
+  };
+
+
+  const updateTimer = async (stepId, minutes) => {
+    try {
+      const response = await fetch(
+        apiUrl(`/executions/${execution.id}/steps/${stepId}/timer`),
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ minutes }),
+        },
+      );
+
+      if (!response.ok) throw new Error("Failed to update timer");
+      toast.success(minutes ? "Timer updated" : "Timer removed");
+      setTimerUpdateMinutes({ ...timerUpdateMinutes, [stepId]: "" });
+      await fetchItem();
+    } catch (error) {
+      console.error("Error updating timer:", error);
+      toast.error("Failed to update timer");
+    }
+  };
+
+  const getTimeRemaining = (deadline) => {
+    if (!deadline) return null;
+    const diffMs = new Date(deadline).getTime() - now;
+    if (diffMs <= 0) return "Expired";
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
   };
 
   const formatDuration = (started, completed) => {
@@ -210,6 +254,8 @@ export default function ItemExecutionPage({ params }) {
         return <Clock size={16} className="text-[#2563FF]" />;
       case "skipped":
         return <XIcon size={16} className="text-[#9B9B9B]" />;
+      case "expired":
+        return <AlertTriangle size={16} className="text-[#DC2626]" />;
       default:
         return null;
     }
@@ -223,6 +269,8 @@ export default function ItemExecutionPage({ params }) {
         return "bg-[#DBEAFE] text-[#2563FF] border-[#2563FF]";
       case "skipped":
         return "bg-[#F3F4F6] text-[#9B9B9B] border-[#9B9B9B]";
+      case "expired":
+        return "bg-[#FEE2E2] text-[#DC2626] border-[#DC2626]";
       default:
         return "bg-[#F9FAFB] text-[#6B7280] border-[#E5E5E5]";
     }
@@ -295,7 +343,9 @@ export default function ItemExecutionPage({ params }) {
                 const canHaveSubsteps = step.can_have_substeps;
                 const isActive = step.step_status === "active";
                 const isDone = step.step_status === "done";
-                const isPending = step.step_status === "pending";
+                const isExpired = step.step_status === "expired";
+                const isTimer = step.step_type === "timer";
+                const remaining = getTimeRemaining(step.timer_deadline_at);
                 const duration = formatDuration(
                   step.started_at,
                   step.completed_at,
@@ -353,6 +403,19 @@ export default function ItemExecutionPage({ params }) {
                                   </button>
                                 )}
                               </div>
+                              {step.step_description && (
+                                <p className="text-[12px] text-[#6B7280] mt-2">{step.step_description}</p>
+                              )}
+                              {step.completion_criteria && (
+                                <p className="text-[12px] text-[#4B5563] mt-1">
+                                  <span className="font-semibold">Completion criteria:</span> {step.completion_criteria}
+                                </p>
+                              )}
+                              {isTimer && (
+                                <p className="text-[12px] text-[#EC4899] mt-1">
+                                  Timer: {step.timer_duration_minutes || "-"} min{remaining ? ` • ${remaining}` : ""}
+                                </p>
+                              )}
                             </div>
 
                             {isActive && (
@@ -373,6 +436,36 @@ export default function ItemExecutionPage({ params }) {
                                 >
                                   <Check size={14} />
                                   Complete
+                                </button>
+                              </div>
+                            )}
+
+                            {(isExpired || (isTimer && remaining === "Expired")) && (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={timerUpdateMinutes[step.id] || ""}
+                                  onChange={(e) =>
+                                    setTimerUpdateMinutes({
+                                      ...timerUpdateMinutes,
+                                      [step.id]: e.target.value,
+                                    })
+                                  }
+                                  placeholder="New timer (min)"
+                                  className="h-8 w-32 px-2 border border-[#E5E5E5] rounded text-[12px]"
+                                />
+                                <button
+                                  onClick={() => updateTimer(step.id, timerUpdateMinutes[step.id] ? parseInt(timerUpdateMinutes[step.id]) : null)}
+                                  className="h-8 px-3 bg-[#2563FF] text-white rounded text-[12px]"
+                                >
+                                  Update
+                                </button>
+                                <button
+                                  onClick={() => updateTimer(step.id, null)}
+                                  className="h-8 px-3 border border-[#E5E5E5] rounded text-[12px]"
+                                >
+                                  Remove
                                 </button>
                               </div>
                             )}
@@ -564,6 +657,13 @@ export default function ItemExecutionPage({ params }) {
                 </div>
               </div>
 
+              {item.description && (
+                <div className="border-b border-[#F6F6F6] pb-4">
+                  <div className="text-[12px] text-[#7A7A7A] mb-2">Description</div>
+                  <div className="text-[13px] text-[#374151]">{item.description}</div>
+                </div>
+              )}
+
               <div className="border-b border-[#F6F6F6] pb-4">
                 <div className="text-[12px] text-[#7A7A7A] mb-2">Progress</div>
                 <div className="text-[24px] font-semibold">
@@ -611,6 +711,16 @@ export default function ItemExecutionPage({ params }) {
                       {
                         stepExecutions.filter(
                           (s) => s.step_status === "pending",
+                        ).length
+                      }
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-[12px]">
+                    <span className="text-[#7A7A7A]">Expired</span>
+                    <span className="font-medium text-[#DC2626]">
+                      {
+                        stepExecutions.filter(
+                          (s) => s.step_status === "expired",
                         ).length
                       }
                     </span>

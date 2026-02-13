@@ -1,8 +1,9 @@
 import json
+import logging
+from typing import Literal, Optional
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
-from typing import Literal, Optional
-import logging
 
 from items import queries
 from utils.db_errors import rethrow_db_error
@@ -10,6 +11,12 @@ from utils.db_errors import rethrow_db_error
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+async def _expire_timer_steps(pool, execution_id: str) -> None:
+    expired = await pool.fetch(queries.EXPIRE_OVERDUE_TIMER_STEPS, execution_id)
+    if expired:
+        await pool.execute(queries.SET_ITEM_EXPIRED_FOR_EXECUTION, execution_id)
 
 
 class ItemCreate(BaseModel):
@@ -22,11 +29,11 @@ class ItemCreate(BaseModel):
 class ItemUpdate(BaseModel):
     title: Optional[str] = Field(default=None, min_length=1, max_length=200)
     description: Optional[str] = Field(default=None, max_length=2000)
-    status: Optional[Literal["not_started", "in_progress", "completed", "archived"]] = None
+    status: Optional[Literal["not_started", "in_progress", "completed", "archived", "expired_step"]] = None
 
 
 @router.get("/")
-async def list_items(request: Request, type: Optional[Literal["task", "product", "habit"]] = None, status: Optional[Literal["not_started", "in_progress", "completed", "archived"]] = None):
+async def list_items(request: Request, type: Optional[Literal["task", "product", "habit"]] = None, status: Optional[Literal["not_started", "in_progress", "completed", "archived", "expired_step"]] = None):
     try:
         pool = request.app.state.pool
         query = queries.LIST_ITEMS_BASE
@@ -69,9 +76,8 @@ async def create_item(request: Request, payload: ItemCreate):
             workflow["id"],
             "not_started",
         )
-        
 
-        steps_snapshot = workflow["steps"]  or []
+        steps_snapshot = workflow["steps"] or []
         if isinstance(steps_snapshot, str):
             steps_snapshot = json.loads(steps_snapshot)
 
@@ -83,14 +89,16 @@ async def create_item(request: Request, payload: ItemCreate):
         )
 
         for idx, step in enumerate(steps_snapshot):
-            print(step)
             await pool.execute(
                 queries.CREATE_STEP_EXECUTION,
                 execution_row["id"],
                 step.get("id"),
                 idx,
                 step.get("name"),
+                step.get("description"),
                 step.get("step_type", "manual"),
+                step.get("completion_criteria"),
+                step.get("timer_duration_minutes"),
                 "pending",
             )
 
@@ -116,6 +124,9 @@ async def get_item(request: Request, item_id: str):
         execution = await pool.fetchrow(queries.GET_ITEM_EXECUTION, item_id)
         steps = []
         if execution:
+            await _expire_timer_steps(pool, execution["id"])
+            execution = await pool.fetchrow(queries.GET_ITEM_EXECUTION, item_id)
+            item = await pool.fetchrow(queries.GET_ITEM, item_id)
             steps = await pool.fetch(queries.GET_EXECUTION_STEPS, execution["id"])
 
         return {

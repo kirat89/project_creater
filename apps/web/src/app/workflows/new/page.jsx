@@ -27,6 +27,8 @@ export default function NewWorkflowPage() {
         step_type: "manual",
         can_have_substeps: false,
         is_required: true,
+        timer_duration_minutes: null,
+        completion_criteria: "",
         tempId: Date.now(),
       },
     ]);
@@ -61,6 +63,14 @@ export default function NewWorkflowPage() {
     const invalidSteps = steps.filter((s) => !s.name || !s.step_type);
     if (invalidSteps.length > 0) {
       setError("All steps must have a name and type");
+      return;
+    }
+
+    const invalidTimer = steps.find(
+      (s) => s.step_type === "timer" && (!s.timer_duration_minutes || s.timer_duration_minutes < 1),
+    );
+    if (invalidTimer) {
+      setError("Timer steps require a timer duration in minutes");
       return;
     }
 
@@ -101,6 +111,8 @@ export default function NewWorkflowPage() {
             step_type: step.step_type,
             can_have_substeps: step.can_have_substeps,
             is_required: step.is_required,
+            timer_duration_minutes: step.step_type === "timer" ? step.timer_duration_minutes : null,
+            completion_criteria: step.completion_criteria || null,
           }),
         });
       }
@@ -273,6 +285,43 @@ export default function NewWorkflowPage() {
                               placeholder="Step description (optional)"
                               className="w-full h-9 px-3 border border-[#E5E5E5] rounded text-[13px] outline-none focus:border-[#2563FF]"
                             />
+
+
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <input
+                                type="text"
+                                value={step.completion_criteria || ""}
+                                onChange={(e) =>
+                                  updateStep(
+                                    step.tempId,
+                                    "completion_criteria",
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="Completion criteria (optional)"
+                                className="w-full h-9 px-3 border border-[#E5E5E5] rounded text-[13px] outline-none focus:border-[#2563FF]"
+                              />
+
+                              {step.step_type === "timer" ? (
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={step.timer_duration_minutes || ""}
+                                  onChange={(e) =>
+                                    updateStep(
+                                      step.tempId,
+                                      "timer_duration_minutes",
+                                      e.target.value ? parseInt(e.target.value) : null,
+                                    )
+                                  }
+                                  placeholder="Timer duration (minutes)"
+                                  className="w-full h-9 px-3 border border-[#E5E5E5] rounded text-[13px] outline-none focus:border-[#2563FF]"
+                                />
+                              ) : (
+                                <div />
+                              )}
+                            </div>
 
                             <div className="flex gap-4">
                               <label className="flex items-center gap-2 text-[12px]">

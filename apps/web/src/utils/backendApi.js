@@ -4,9 +4,9 @@ const API_BASE_URL =
 export const API_ENUMS = {
   workflowTypes: ["task", "product", "habit", "generic"],
   itemTypes: ["task", "product", "habit"],
-  itemStatuses: ["not_started", "in_progress", "completed", "archived"],
+  itemStatuses: ["not_started", "in_progress", "completed", "archived", "expired_step"],
   stepTypes: ["manual", "checklist", "approval", "timer"],
-  stepStatuses: ["pending", "active", "done", "skipped"],
+  stepStatuses: ["pending", "active", "done", "skipped", "expired"],
   substepStatuses: ["pending", "done"],
 };
 

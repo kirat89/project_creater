@@ -21,6 +21,8 @@ export default function EditWorkflowPage({ params }) {
     can_have_substeps: false,
     is_required: true,
     estimated_minutes: null,
+    timer_duration_minutes: null,
+    completion_criteria: "",
   });
 
   useEffect(() => {
@@ -76,6 +78,10 @@ export default function EditWorkflowPage({ params }) {
       toast.error("Step name is required");
       return;
     }
+    if (newStep.step_type === "timer" && (!newStep.timer_duration_minutes || newStep.timer_duration_minutes < 1)) {
+      toast.error("Timer steps require a timer duration");
+      return;
+    }
 
     try {
       assertRequiredString(newStep.name, "step.name");
@@ -98,6 +104,8 @@ export default function EditWorkflowPage({ params }) {
           can_have_substeps: false,
           is_required: true,
           estimated_minutes: null,
+          timer_duration_minutes: null,
+          completion_criteria: "",
         });
         await fetchWorkflow();
       } else {
@@ -288,6 +296,16 @@ export default function EditWorkflowPage({ params }) {
                                 Optional
                               </span>
                             )}
+                            {step.timer_duration_minutes && (
+                              <span className="text-[11px] px-2 py-1 bg-[#FCE7F3] text-[#EC4899] rounded">
+                                Timer: {step.timer_duration_minutes} min
+                              </span>
+                            )}
+                            {step.completion_criteria && (
+                              <span className="text-[11px] px-2 py-1 bg-[#EEF2FF] text-[#4F46E5] rounded">
+                                Criteria: {step.completion_criteria}
+                              </span>
+                            )}
                             {step.estimated_minutes && (
                               <span className="text-[11px] px-2 py-1 bg-[#FEF3C7] text-[#F59E0B] rounded">
                                 ~{step.estimated_minutes} min
@@ -356,24 +374,41 @@ export default function EditWorkflowPage({ params }) {
                     />
                   </div>
 
+                  <div>
+                    <label className="block text-[13px] font-medium mb-2">
+                      Completion Criteria
+                    </label>
+                    <input
+                      type="text"
+                      value={newStep.completion_criteria}
+                      onChange={(e) =>
+                        setNewStep({ ...newStep, completion_criteria: e.target.value })
+                      }
+                      placeholder="Define what done means for this step"
+                      className="w-full h-10 px-4 border border-[#E5E5E5] rounded-lg text-[13px] outline-none focus:border-[#2563FF]"
+                    />
+                  </div>
+
                   <div className="grid grid-cols-3 gap-4">
                     <div>
                       <label className="block text-[13px] font-medium mb-2">
-                        Estimated Time (min)
+                        Timer Duration (min)
                       </label>
                       <input
                         type="number"
-                        value={newStep.estimated_minutes || ""}
+                        min="1"
+                        disabled={newStep.step_type !== "timer"}
+                        value={newStep.timer_duration_minutes || ""}
                         onChange={(e) =>
                           setNewStep({
                             ...newStep,
-                            estimated_minutes: e.target.value
+                            timer_duration_minutes: e.target.value
                               ? parseInt(e.target.value)
                               : null,
                           })
                         }
                         placeholder="30"
-                        className="w-full h-10 px-4 border border-[#E5E5E5] rounded-lg text-[13px] outline-none focus:border-[#2563FF]"
+                        className="w-full h-10 px-4 border border-[#E5E5E5] rounded-lg text-[13px] outline-none focus:border-[#2563FF] disabled:bg-[#F9FAFB]"
                       />
                     </div>
 
