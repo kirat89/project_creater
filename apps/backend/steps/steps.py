@@ -18,6 +18,8 @@ class StepCreate(BaseModel):
     step_type: str = "manual"
     can_have_substeps: bool = False
     is_required: bool = False
+    timer_duration_minutes: Optional[int] = None
+    completion_criteria: Optional[str] = None
 
 
 class StepUpdate(BaseModel):
@@ -26,6 +28,8 @@ class StepUpdate(BaseModel):
     step_type: Optional[str] = None
     can_have_substeps: Optional[bool] = None
     is_required: Optional[bool] = None
+    timer_duration_minutes: Optional[int] = None
+    completion_criteria: Optional[str] = None
 
 
 @router.get("/")
@@ -45,6 +49,9 @@ async def create_step(request: Request, payload: StepCreate):
         if not payload.name or not payload.workflow_id:
             raise HTTPException(status_code=400, detail="name and workflow_id are required")
 
+        if payload.step_type == "timer" and (payload.timer_duration_minutes is None or payload.timer_duration_minutes < 1):
+            raise HTTPException(status_code=400, detail="timer_duration_minutes is required for timer steps")
+
         pool = request.app.state.pool
         workflow = await pool.fetchrow(queries.GET_ACTIVE_WORKFLOW, payload.workflow_id)
         if not workflow:
@@ -62,6 +69,8 @@ async def create_step(request: Request, payload: StepCreate):
             payload.step_type,
             payload.can_have_substeps,
             payload.is_required,
+            payload.timer_duration_minutes,
+            payload.completion_criteria,
         )
         return {"step": dict(row)}
     except Exception as exc:
@@ -86,6 +95,23 @@ async def get_step(request: Request, step_id: str):
 async def update_step(request: Request, step_id: str, payload: StepUpdate):
     try:
         pool = request.app.state.pool
+        next_step_type = payload.step_type
+        if next_step_type is None:
+            current = await pool.fetchrow(queries.GET_STEP, step_id)
+            if not current:
+                raise HTTPException(status_code=404, detail="Step not found")
+            next_step_type = current["step_type"]
+
+        next_timer_duration = payload.timer_duration_minutes
+        if next_timer_duration is None and next_step_type == "timer":
+            current = await pool.fetchrow(queries.GET_STEP, step_id)
+            if not current:
+                raise HTTPException(status_code=404, detail="Step not found")
+            next_timer_duration = current["timer_duration_minutes"]
+
+        if next_step_type == "timer" and (next_timer_duration is None or next_timer_duration < 1):
+            raise HTTPException(status_code=400, detail="timer_duration_minutes is required for timer steps")
+
         updates = []
         params = []
         param_idx = 1
@@ -109,6 +135,14 @@ async def update_step(request: Request, step_id: str, payload: StepUpdate):
         if payload.is_required is not None:
             updates.append(f"is_required = ${param_idx}")
             params.append(payload.is_required)
+            param_idx += 1
+        if payload.timer_duration_minutes is not None:
+            updates.append(f"timer_duration_minutes = ${param_idx}")
+            params.append(payload.timer_duration_minutes)
+            param_idx += 1
+        if payload.completion_criteria is not None:
+            updates.append(f"completion_criteria = ${param_idx}")
+            params.append(payload.completion_criteria)
             param_idx += 1
 
         if not updates:

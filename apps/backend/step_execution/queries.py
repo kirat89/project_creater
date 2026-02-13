@@ -1,7 +1,10 @@
 LIST_EXECUTION_STEPS = "SELECT * FROM step_executions WHERE workflow_execution_id = $1 ORDER BY step_order"
 UPDATE_STEP_STATUS = """
 UPDATE step_executions
-SET status = $1, completed_at = NOW()
+SET status = $1,
+    started_at = CASE WHEN $1 = 'active' AND started_at IS NULL THEN NOW() ELSE started_at END,
+    completed_at = CASE WHEN $1 IN ('done', 'skipped') THEN NOW() WHEN $1 = 'active' THEN NULL ELSE completed_at END,
+    updated_at = NOW()
 WHERE id = $2 AND workflow_execution_id = $3
 RETURNING *
 """
@@ -11,7 +14,7 @@ WHERE workflow_execution_id = $1 AND step_order > $2
 ORDER BY step_order
 LIMIT 1
 """
-ACTIVATE_STEP_BY_ID = "UPDATE step_executions SET status = 'active' WHERE id = $1"
+ACTIVATE_STEP_BY_ID = "UPDATE step_executions SET status = 'active', started_at = COALESCE(started_at, NOW()), updated_at = NOW() WHERE id = $1"
 COMPLETE_WORKFLOW_EXECUTION = "UPDATE workflow_executions SET status = 'completed', completed_at = NOW() WHERE id = $1"
 GET_MAX_SUBSTEP_ORDER = "SELECT COALESCE(MAX(substep_order), 0) FROM substep_executions WHERE step_execution_id = $1"
 CREATE_SUBSTEP = """
@@ -31,3 +34,22 @@ DELETE_SUBSTEP = "DELETE FROM substep_executions WHERE id = $1"
 
 GET_STEP_NOTES = "SELECT id, step_execution_id, content AS note, created_by, created_at, updated_at FROM step_notes WHERE step_execution_id = $1 ORDER BY created_at DESC"
 CREATE_STEP_NOTE = "INSERT INTO step_notes (step_execution_id, content, created_by) VALUES ($1, $2, $3) RETURNING id, step_execution_id, content AS note, created_by, created_at, updated_at"
+GET_STEP_EXECUTION = "SELECT * FROM step_executions WHERE id = $1 AND workflow_execution_id = $2"
+UPDATE_TIMER_FOR_STEP = """
+UPDATE step_executions
+SET timer_duration_minutes = $1,
+    timer_deadline_at = CASE
+      WHEN $1 IS NULL THEN NULL
+      ELSE NOW() + ($1 || ' minutes')::interval
+    END,
+    status = CASE WHEN status = 'expired' AND $1 IS NOT NULL THEN 'active' ELSE status END,
+    updated_at = NOW()
+WHERE id = $2 AND workflow_execution_id = $3
+RETURNING *
+"""
+RESET_ITEM_STATUS_IF_RESUMED = """
+UPDATE items
+SET status = 'in_progress', updated_at = NOW()
+WHERE id = (SELECT item_id FROM workflow_executions WHERE id = $1)
+  AND status = 'expired_step'
+"""
