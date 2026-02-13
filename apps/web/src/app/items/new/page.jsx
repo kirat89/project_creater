@@ -224,9 +224,6 @@ export default function NewItemPage() {
                           <span className="text-[11px] px-2 py-1 bg-white text-[#2563FF] rounded border border-[#2563FF]">
                             {workflow.workflow_type}
                           </span>
-                          <span className="text-[11px] text-[#9B9B9B]">
-                            v{workflow.current_version}
-                          </span>
                         </div>
                       </div>
                     ))}

@@ -1,7 +1,36 @@
 LIST_ITEMS_BASE = """
 SELECT
   i.*,
-  wv.snapshot AS workflow_data,
+  (
+    SELECT COALESCE(
+      jsonb_build_object(
+        'id', w.id,
+        'name', w.name,
+        'description', w.description,
+        'type', w.type,
+        'steps', COALESCE(
+          (
+            SELECT jsonb_agg(
+              jsonb_build_object(
+                'id', ws.id,
+                'name', ws.name,
+                'description', ws.description,
+                'step_order', ws.step_order,
+                'step_type', ws.step_type,
+                'can_have_substeps', ws.can_have_substeps,
+                'is_required', ws.is_required
+              )
+              ORDER BY ws.step_order
+            )
+            FROM workflow_steps ws
+            WHERE ws.workflow_id = w.id AND ws.is_active = true
+          ),
+          '[]'::jsonb
+        )
+      ),
+      '{}'::jsonb
+    )
+  ) AS workflow_data,
   (
     SELECT COUNT(*)::int
     FROM step_executions se
@@ -15,24 +44,40 @@ SELECT
     WHERE we.item_id = i.id
   ) AS total_steps
 FROM items i
-LEFT JOIN workflow_versions wv ON i.workflow_version_id = wv.id
-LEFT JOIN workflows w ON wv.workflow_id = w.id
+LEFT JOIN workflows w ON i.workflow_id = w.id
 WHERE (w.id IS NULL OR w.is_active = true)
 """
-GET_LATEST_WORKFLOW_VERSION = """
-SELECT wv.*
-FROM workflow_versions wv
-JOIN workflows w ON w.id = wv.workflow_id
-WHERE wv.workflow_id = $1 AND w.is_active = true
-ORDER BY wv.version_number DESC
-LIMIT 1
+GET_ACTIVE_WORKFLOW_WITH_STEPS = """
+SELECT
+  w.*,
+  COALESCE(
+    (
+      SELECT jsonb_agg(
+        jsonb_build_object(
+          'id', ws.id,
+          'name', ws.name,
+          'description', ws.description,
+          'step_order', ws.step_order,
+          'step_type', ws.step_type,
+          'can_have_substeps', ws.can_have_substeps,
+          'is_required', ws.is_required
+        )
+        ORDER BY ws.step_order
+      )
+      FROM workflow_steps ws
+      WHERE ws.workflow_id = w.id AND ws.is_active = true
+    ),
+    '[]'::jsonb
+  ) AS steps
+FROM workflows w
+WHERE w.id = $1 AND w.is_active = true
 """
 CREATE_ITEM = (
-    "INSERT INTO items (title, description, type, workflow_version_id, status) "
+    "INSERT INTO items (title, description, type, workflow_id, status) "
     "VALUES ($1, $2, $3, $4, $5) RETURNING *"
 )
 CREATE_WORKFLOW_EXECUTION = (
-    "INSERT INTO workflow_executions (item_id, workflow_version_id, status) "
+    "INSERT INTO workflow_executions (item_id, workflow_id, status) "
     "VALUES ($1, $2, $3) RETURNING *"
 )
 CREATE_STEP_EXECUTION = """

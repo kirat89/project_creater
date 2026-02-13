@@ -73,7 +73,7 @@ export default function WorkflowDetailPage({ params }) {
               <div>
                 <h1 className="text-[16px] font-semibold">{workflow.name}</h1>
                 <div className="text-[11px] text-[#9B9B9B]">
-                  {workflow.workflow_type} • v{workflow.current_version}
+                  {workflow.workflow_type}
                 </div>
               </div>
             </div>
@@ -111,14 +111,6 @@ export default function WorkflowDetailPage({ params }) {
                     <div className="text-[11px] text-[#7A7A7A] mb-1">Type</div>
                     <span className="text-[11px] px-2 py-1 bg-[#EEF2FF] text-[#2563FF] rounded capitalize">
                       {workflow.workflow_type}
-                    </span>
-                  </div>
-                  <div>
-                    <div className="text-[11px] text-[#7A7A7A] mb-1">
-                      Version
-                    </div>
-                    <span className="text-[13px] font-medium">
-                      v{workflow.current_version}
                     </span>
                   </div>
                   <div>
