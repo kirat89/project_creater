@@ -1,3 +1,4 @@
+import json
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import Literal, Optional
@@ -68,8 +69,11 @@ async def create_item(request: Request, payload: ItemCreate):
             workflow["id"],
             "not_started",
         )
+        
 
-        steps_snapshot = workflow["steps"] or []
+        steps_snapshot = workflow["steps"]  or []
+        if isinstance(steps_snapshot, str):
+            steps_snapshot = json.loads(steps_snapshot)
 
         execution_row = await pool.fetchrow(
             queries.CREATE_WORKFLOW_EXECUTION,
@@ -79,6 +83,7 @@ async def create_item(request: Request, payload: ItemCreate):
         )
 
         for idx, step in enumerate(steps_snapshot):
+            print(step)
             await pool.execute(
                 queries.CREATE_STEP_EXECUTION,
                 execution_row["id"],
