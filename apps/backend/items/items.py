@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import Literal, Optional
-import json
 import logging
 
 from items import queries
@@ -57,32 +56,29 @@ async def create_item(request: Request, payload: ItemCreate):
             raise HTTPException(status_code=400, detail="title, item_type and workflow_id are required")
 
         pool = request.app.state.pool
-        version = await pool.fetchrow(queries.GET_LATEST_WORKFLOW_VERSION, payload.workflow_id)
-        if not version:
-            raise HTTPException(status_code=404, detail="Workflow not found or inactive. Please publish an active workflow first.")
+        workflow = await pool.fetchrow(queries.GET_ACTIVE_WORKFLOW_WITH_STEPS, payload.workflow_id)
+        if not workflow:
+            raise HTTPException(status_code=404, detail="Workflow not found or inactive.")
 
         item_row = await pool.fetchrow(
             queries.CREATE_ITEM,
             payload.title,
             payload.description,
             payload.item_type,
-            version["id"],
+            workflow["id"],
             "not_started",
         )
 
-        snapshot = version["snapshot"]
-        if isinstance(snapshot, str):
-            snapshot = json.loads(snapshot)
+        steps_snapshot = workflow["steps"] or []
 
         execution_row = await pool.fetchrow(
             queries.CREATE_WORKFLOW_EXECUTION,
             item_row["id"],
-            version["id"],
+            workflow["id"],
             "not_started",
         )
 
-        steps = snapshot.get("steps", [])
-        for idx, step in enumerate(steps):
+        for idx, step in enumerate(steps_snapshot):
             await pool.execute(
                 queries.CREATE_STEP_EXECUTION,
                 execution_row["id"],
@@ -93,7 +89,7 @@ async def create_item(request: Request, payload: ItemCreate):
                 "pending",
             )
 
-        if steps:
+        if steps_snapshot:
             await pool.execute(queries.ACTIVATE_FIRST_STEP, execution_row["id"])
             await pool.execute(queries.SET_WORKFLOW_EXECUTION_IN_PROGRESS, execution_row["id"])
             await pool.execute(queries.SET_ITEM_IN_PROGRESS, item_row["id"])

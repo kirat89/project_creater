@@ -132,13 +132,6 @@ export default function EditWorkflowPage({ params }) {
     }
   };
 
-  const publishVersion = async () => {
-    if (!confirm("This will create a new version of the workflow. Continue?"))
-      return;
-
-    toast.info("Workflow publish endpoint is not available in backend API yet.");
-  };
-
   const getStepTypeColor = (type) => {
     switch (type) {
       case "manual":
@@ -184,9 +177,7 @@ export default function EditWorkflowPage({ params }) {
               </a>
               <div>
                 <h1 className="text-[16px] font-semibold">Edit Workflow</h1>
-                <div className="text-[11px] text-[#9B9B9B]">
-                  {workflow.name} • v{workflow.current_version}
-                </div>
+                <div className="text-[11px] text-[#9B9B9B]">{workflow.name}</div>
               </div>
             </div>
             <div className="flex gap-3">
@@ -197,13 +188,6 @@ export default function EditWorkflowPage({ params }) {
               >
                 <Save size={14} />
                 {saving ? "Saving..." : "Save Changes"}
-              </button>
-              <button
-                onClick={publishVersion}
-                disabled={saving}
-                className="h-10 px-6 bg-[#2563FF] text-white text-[13px] font-semibold rounded-lg hover:bg-[#1D4ED8] flex items-center gap-2"
-              >
-                Publish Version
               </button>
             </div>
           </div>
@@ -444,30 +428,11 @@ export default function EditWorkflowPage({ params }) {
         {/* Right Info Panel */}
         <div className="w-[300px] h-full border-l border-[#EDEDED] flex flex-col">
           <div className="h-[64px] flex items-center justify-between px-6 border-b border-[#EDEDED]">
-            <span className="text-[14px] font-semibold">Publishing</span>
+            <span className="text-[14px] font-semibold">Workflow Info</span>
           </div>
 
           <div className="px-6 pt-6">
             <div className="space-y-4">
-              <div className="border-b border-[#F6F6F6] pb-4">
-                <div className="text-[12px] text-[#7A7A7A] mb-2">
-                  Current Version
-                </div>
-                <div className="text-[24px] font-semibold">
-                  v{workflow.current_version}
-                </div>
-              </div>
-
-              <div className="bg-[#EEF2FF] border border-[#DBEAFE] rounded-lg p-4">
-                <div className="text-[12px] font-semibold mb-2 text-[#2563FF]">
-                  About Versions
-                </div>
-                <div className="text-[11px] text-[#7A7A7A]">
-                  Changes to steps require publishing a new version. Existing
-                  items will continue using their original version.
-                </div>
-              </div>
-
               <div className="pt-4 border-t border-[#F6F6F6]">
                 <div className="text-[12px] text-[#7A7A7A] mb-2">
                   Total Steps

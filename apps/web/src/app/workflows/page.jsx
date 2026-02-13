@@ -213,9 +213,6 @@ export default function WorkflowsPage() {
                       <span className="text-[11px] px-2 py-1 bg-[#EEF2FF] text-[#2563FF] rounded">
                         {workflow.workflow_type}
                       </span>
-                      <span className="text-[11px] text-[#9B9B9B]">
-                        v{workflow.current_version}
-                      </span>
                       {workflow.is_active && (
                         <span className="text-[11px] px-2 py-1 bg-[#D1FAE5] text-[#10B981] rounded">
                           Active
